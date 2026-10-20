@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GK FIFTH EXAM</title>
+  
+  <!-- Firebase SDK (Google-er free database) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-color: #cbd5e1;
+      --primary-color: #4f46e5;
+      --primary-hover: #4338ca;
+      --correct-bg: #dcfce7;
+      --correct-border: #22c55e;
+      --correct-text: #15803d;
+      --wrong-bg: #fee2e2;
+      --wrong-border: #ef4444;
+      --wrong-text: #b91c1c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+    .quiz-card { background: var(--card-bg); width: 100%; max-width: 650px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); padding: 32px; }
+    .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border-color); }
+    .progress-text { font-size: 14px; font-weight: 600; color: var(--primary-color); background: rgba(79, 70, 229, 0.1); padding: 6px 14px; border-radius: 20px; }
+    .progress-bar-container { width: 100%; height: 8px; background-color: var(--border-color); border-radius: 10px; margin-bottom: 24px; overflow: hidden; }
+    .progress-bar { height: 100%; background-color: var(--primary-color); width: 0%; transition: width 0.3s ease; }
+    .question-title { font-size: 20px; font-weight: 700; line-height: 1.4; margin-bottom: 20px; }
+    .options-grid { display: flex; flex-direction: column; gap: 12px; }
+    .option-btn { width: 100%; padding: 14px 18px; font-size: 16px; text-align: left; background: transparent; color: var(--text-main); border: 2px solid var(--border-color); border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+    .option-btn:hover:not(:disabled) { border-color: var(--primary-color); background-color: rgba(79, 70, 229, 0.05); }
+    .option-btn.correct { background-color: var(--correct-bg) !important; border-color: var(--correct-border) !important; color: var(--correct-text) !important; font-weight: 600; }
+    .option-btn.wrong { background-color: var(--wrong-bg) !important; border-color: var(--wrong-border) !important; color: var(--wrong-text) !important; font-weight: 600; }
+    .footer-actions { margin-top: 28px; display: flex; justify-content: flex-end; }
+    .next-btn { background-color: var(--primary-color); color: white; border: none; padding: 12px 28px; font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer; display: none; }
+    
+    .result-screen { text-align: center; display: none; }
+    
+    /* 🌟 Shundor Interface-er Design */
+    .user-info-screen {
+      text-align: center;
+      padding: 10px 5px;
+    }
+
+    .welcome-icon {
+      font-size: 45px;
+      margin-bottom: 10px;
+      display: inline-block;
+      animation: bounce 2s infinite;
+    }
+
+    .user-info-screen h2 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
+    }
+
+    .user-info-screen p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-top: 6px;
+      margin-bottom: 25px;
+    }
+
+    .input-group {
+      position: relative;
+      margin-bottom: 25px;
+    }
+
+    .user-info-screen input {
+      width: 100%;
+      padding: 16px 20px;
+      font-size: 16px;
+      color: var(--text-main);
+      background-color: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      outline: none;
+      transition: all 0.3s ease;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .user-info-screen input:focus {
+      border-color: var(--primary-color);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.15);
+    }
+
+    .start-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+      color: white;
+      border: none;
+      padding: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.4);
+      transition: all 0.3s ease;
+    }
+
+    .start-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 25px -4px rgba(79, 70, 229, 0.5);
+    }
+
+    .start-btn:active {
+      transform: translateY(0);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    
+    .score-circle { width: 150px; height: 150px; border-radius: 50%; background: rgba(79, 70, 229, 0.1); color: var(--primary-color); display: flex; flex-direction: column; justify-content: center; align-items: center; margin: 20px auto; font-size: 36px; font-weight: 800; }
+    .score-details { display: flex; justify-content: space-around; margin: 20px 0; background: #f8fafc; padding: 16px; border-radius: 10px; border: 1px solid var(--border-color); }
+  </style>
+</head>
+<body>
+
+  <div class="quiz-card">
+    
+    <!-- ১. Shundor Name Entry Screen -->
+    <div id="user-info-view" class="user-info-screen" style="display: block;">
+      <div class="welcome-icon">📝</div>
+      <h2>Welcome to third GK Exam!</h2>
+      <p>Write your full name below</p>
+      
+      <div class="input-group">
+        <input type="text" id="user-name" placeholder="Write your name here..." autocomplete="off">
+      </div>
+      
+      <button class="start-btn" onclick="startQuiz()">Start Exam ➔</button>
+    </div>
+
+    <!-- ২. Mul Quiz Screen -->
+    <div id="quiz-view" style="display: none;">
+      <div class="top-bar">
+        <h2 id="display-name" style="font-size: 16px;"></h2>
+        <span class="progress-text" id="progress-text">Question 1/40</span>
+      </div>
+
+      <div class="progress-bar-container">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+
+      <div class="question-title" id="question-title">QUESTION LOADING...</div>
+
+      <div class="options-grid" id="options-grid"></div>
+
+      <div class="footer-actions">
+        <button class="next-btn" id="next-btn" onclick="handleNextQuestion()">NEXT QUESTION ➔</button>
+      </div>
+    </div>
+
+    <!-- ৩. Result Screen -->
+    <div class="result-screen" id="result-view">
+      <h2>Exam finish!</h2>
+      <p style="color: var(--text-muted)">Tumar folafol joma hoise pakhi</p>
+      
+      <div class="score-circle">
+        <div id="final-score">০.০০</div>
+        <span style="font-size: 14px; color: var(--text-muted);">Total score / 40</span>
+      </div>
+
+      <div class="score-details">
+        <div><strong style="color: var(--correct-border); font-size: 20px;" id="correct-count">০</strong><br><small>Sathik (+1.00)</small></div>
+        <div><strong style="color: var(--wrong-border); font-size: 20px;" id="wrong-count">০</strong><br><small>Bhul (-0.25)</small></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ⚙️ Apnar Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCTgSqtcDRtvfbIECDFEv_2jAEgModArXc",
+      authDomain: "gk-exam-2.firebaseapp.com",
+      projectId: "gk-exam-2",
+      storageBucket: "gk-exam-2.firebasestorage.app",
+      messagingSenderId: "52008698353",
+      appId: "1:52008698353:web:08a24e1451711ab72f0450",
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // 40-ti question ebong correct answer index
+    const questionsDatabase = [
+      { question: "1. বাংলায় স্বাধীন সুলতানি শাসনের প্রতিষ্ঠাতা হিসেবে কাকে গণ্য করা হয়?", options: ["শামসুদ্দিন ইলিয়াস শাহ ", "আলাউদ্দিন হোসেন শাহ", "শশাঙ্ক", "গিয়াসউদ্দিন আজম শাহ"], correct: 0 },
+      { question: "2. কনস্টান্টিনোপলের পতন ঘটে কত সালে?", options: ["১২০৪", "১৪৫৩", "১৪৯৮","১৫১৭"], correct: 1 },
+      { question: "3.  সোমপুর মহাবিহার নির্মাণের সঙ্গে কোন পাল শাসকের নাম বিশেষভাবে যুক্ত?", options: ["গোপাল", "ধর্মপাল", "দেবপাল", "মহীপাল"], correct: 1 },
+      { question: "4. আমেরিকার স্বাধীনতার ঘোষণাপত্র গৃহীত হয় কবে?", options: ["৪ জুলাই ১৭৭৬", "১৪ জুলাই ১৭৮৯", "১৭ সেপ্টেম্বর ১৭৮৭", "৩ সেপ্টেম্বর ১৭৮৩"], correct: 0 },
+      { question: "5. চর্যাপদ আবিষ্কার ও প্রকাশের কৃতিত্ব কার?", options: ["দীনেশচন্দ্র সেন", "হরপ্রসাদ শাস্ত্রী", "সুনীতিকুমার চট্টোপাধ্যায়", "মুহম্মদ শহীদুল্লাহ"], correct: 1 },
+      { question: "6.বঙ্গভঙ্গ রদ করা হয় কোন সালে?", options: ["১৯০৯", "১৯১১", "১৯১৯", "১৯৪৭"], correct: 1 },
+      { question: "7. ২০২৬ সালের জাতীয় সংসদ নির্বাচনে বিএনপি কতটি আসন পেয়েছিল বলে প্রকাশিত প্রতিবেদনে উল্লেখ করা হয়?", options: ["১৫১", "১৮৫", "২১২", "২৩৫"], correct: 2 },
+      { question: "8.  ভার্নাকুলার প্রেস অ্যাক্ট কোন ব্রিটিশ ভাইসরয়ের শাসনামলে জারি হয়?", options: ["লর্ড রিপন", "লর্ড লিটন", "লর্ড কার্জন", "লর্ড মিন্টো"], correct: 1 },
+      { question: "9. IMF–বিশ্বব্যাংকের ২০২৬ সালের বার্ষিক সভায় বাংলাদেশের অর্থনৈতিক সংস্কার পরিকল্পনা উপস্থাপনকারী প্রতিনিধিদলের নেতৃত্ব দিচ্ছেন কে?", options: ["আমির খসরু মাহমুদ চৌধুরী", "সালেহউদ্দিন আহমেদ", " মুস্তফা কামাল","আবুল হাসান মাহমুদ আলী"], correct: 0 },
+      { question: "10.  ইলবার্ট বিল বিতর্ক কোন ভাইসরয়ের শাসনামলে সংঘটিত হয়?", options: ["লর্ড রিপন", "লর্ড ডাফরিন", "লর্ড কার্জন", "লর্ড হার্ডিঞ্জ"], correct: 0 },
+      { question: "11.. সাঁওতাল বিদ্রোহের সঙ্গে কোন অঞ্চলটি বিশেষভাবে সম্পর্কিত?", options: ["বরেন্দ্র অঞ্চল", "দামিন-ই-কোহ", "ভাওয়াল অঞ্চল", "সুন্দরবন অঞ্চল"], correct: 1 },
+      { question: "12. চট্টগ্রাম অস্ত্রাগার লুণ্ঠন অভিযানের প্রধান নেতা কে ছিলেন?", options: ["ক্ষুদিরাম বসু", "বাঘা যতীন", "সূর্য সেন", "প্রফুল্ল চাকী"], correct: 2 },
+      { question: "13. ভারতীয় জাতীয় কংগ্রেসের প্রথম মুসলিম সভাপতি কে ছিলেন?", options: ["মওলানা আবুল কালাম আজাদ", "বদরুদ্দিন তায়েবজি", "মুহাম্মদ আলী জিন্নাহ", "হাকিম আজমল খান"], correct: 1 },
+      { question: "14. তেভাগা আন্দোলনে ভাগচাষিরা উৎপাদিত ফসলের কত অংশ দাবি করেছিলেন?", options: ["এক-চতুর্থাংশ", "এক-তৃতীয়াংশ", "অর্ধেক", "দুই-তৃতীয়াংশ"], correct: 3 },
+      { question: "15. ঢাকা বিশ্ববিদ্যালয় আনুষ্ঠানিকভাবে যাত্রা শুরু করে কবে?", options: ["১৯১১ সালে", "১৯২১ সালে", "১৯৩৫ সালে", "১৯৪৭ সালে"], correct: 1 },
+      { question: "16. বাংলা একাডেমি প্রতিষ্ঠিত হয় কোন সালে?", options: ["১৯৪৮", "১৯৫২", "১৯৫৫", "১৯৬২"], correct: 2 },
+      { question: "17. রোসেটা পাথর পাঠোদ্ধারের মাধ্যমে কোন প্রাচীন লিপি বুঝতে গুরুত্বপূর্ণ ভূমিকা রাখে?", options: ["কিউনিফর্ম", "মিশরীয় হায়ারোগ্লিফিক", "ব্রাহ্মী", "আরামাইক"], correct: 1 },
+      { question: "18.  মেইজি পুনর্গঠন কোন দেশের আধুনিকায়নের ইতিহাসে গুরুত্বপূর্ণ ঘটনা?", options: ["চীন", "জাপান", "দক্ষিণ কোরিয়া", "থাইল্যান্ড"], correct: 1 },
+      { question: "19. দ্বিতীয় বিশ্বযুদ্ধের পর ইউরোপের অর্থনৈতিক পুনর্গঠনের জন্য কোন পরিকল্পনা নেওয়া হয়েছিল?", options: ["মার্শাল পরিকল্পনা", "মনরো নীতি", "ট্রুম্যান-ডকট্রিন", "ডজ পরিকল্পনা"], correct: 0 },
+      { question: "20. বাংলাদেশের জাতীয় পতাকা প্রথম উত্তোলন করা হয় কোথায়?", options: ["রমনা রেসকোর্স ময়দান", "ঢাকা বিশ্ববিদ্যালয়ের কলাভবন প্রাঙ্গণ", "পল্টন ময়দান", "লালদীঘি ময়দান"], correct: 1 },
+      { question: "21. বার্লিন অবরোধ ও বিমানযোগে সরবরাহ অভিযান কোন ঐতিহাসিক দ্বন্দ্বের অংশ?", options: ["প্রথম বিশ্বযুদ্ধ", "শীতল যুদ্ধ", "ক্রিমিয়ার যুদ্ধ", "ভিয়েতনাম যুদ্ধ"], correct: 1 },
+      { question: "22.  বাংলাদেশের সংবিধানে রাষ্ট্র পরিচালনার মূলনীতি কয়টি?", options: ["৩টি", "৪টি", "৫টি", "৬টি"], correct: 1 },
+      { question: "23.  বাংলাদেশের প্রথম আদমশুমারি স্বাধীনতার পর অনুষ্ঠিত হয় কোন সালে?", options: ["১৯৭২", "১৯৭৪", "১৯৭৬", "১৯৮১"], correct: 1 },
+      { question: "24. প্রকাশিত ২০২৬ সালের নির্বাচনী ফলাফলে বিএনপি এককভাবে কতটি আসন পেয়েছে?", options: ["২০৯", "২১২", "১৯৮", "২২১"], correct: 0 },
+      { question: "25. একই IMF পূর্বাভাসে বাংলাদেশের মূল্যস্ফীতি কত হতে পারে বলে উল্লেখ করা হয়?", options: ["৬.২%", "৭.৫%", "৯.১%", "১০.৯%"], correct: 3 },
+      { question: "26. ২০২৬ সালের অক্টোবরের বৈশ্বিক অর্থনৈতিক আলোচনায় জ্বালানি সরবরাহে বড় ধাক্কার সঙ্গে কোন গুরুত্বপূর্ণ নৌপথের সংকটের কথা উঠে আসে?", options: ["মালাক্কা প্রণালি", "হরমুজ প্রণালি", "জিব্রাল্টার প্রণালি", "বসফরাস প্রণালি"], correct: 1 }
+      { question: "27. বাংলাদেশের ২০২৬ সালের নির্বাচনে মোট ভোটারসংখ্যা প্রায় কত ছিল বলে নির্বাচন-সংক্রান্ত তথ্যে উল্লেখ করা হয়?", options: ["৯.৮ কোটি", "১০.৫ কোটি", "12.77 কোটি", "১৪.২ কোটি"], correct: 2 },
+      { question: "28.বিশ্ব খাদ্য দিবস প্রতি বছর কোন তারিখে পালিত হয়?", options: ["৫ জুন", "১৬ অক্টোবর", "২৪ অক্টোবর", "১০ ডিসেম্বর"], correct: 1 },
+      { question: "29. বাংলাদেশের ২০২৬–২৭ অর্থবছরের প্রবৃদ্ধি নিয়ে IMF-এর পূর্বাভাসে কোন বিষয়টি বিশেষভাবে আলোচনায় এসেছে?", options: [" প্রবৃদ্ধি ১০ শতাংশ ছাড়িয়ে যাওয়ার সম্ভাবনা", "প্রবৃদ্ধি কমে ৩.২ শতাংশ হওয়ার পূর্বাভাস", "অর্থনৈতিক প্রবৃদ্ধি পুরোপুরি বন্ধ হয়ে যাওয়া", " বাংলাদেশ ইউরোজোনে যোগ দেওয়া"], correct: 1 },
+      { question: "30.  অর্থনীতিতে 'Fiscal Consolidation' বলতে সাধারণত কী বোঝায়?", options: ["সরকারি আয়-ব্যয়ের ভারসাম্য উন্নত করে ঘাটতি ও ঋণের চাপ কমানো", "সব সরকারি ব্যয় দ্বিগুণ করা", "রপ্তানি পুরোপুরি বন্ধ করা", "কেন্দ্রীয় ব্যাংক বিলুপ্ত করা"], correct: 0 },
+      { question: "31.২০২৬ সালের অক্টোবরে সাংহাই সহযোগিতা সংস্থার (SCO) সরকারপ্রধানদের বৈঠক কোন শহরে অনুষ্ঠিত হয়?", options: ["আস্তানা", "দুশানবে", "বেইজিং", "সমরকন্দ"], correct: 1 },
+      { question: "32. কোন চুক্তির মাধ্যমে ইউরোপীয় অর্থনৈতিক সম্প্রদায় (EEC) প্রতিষ্ঠিত হয়?", options: ["মাষ্ট্রিখ্ট চুক্তি", "রোম চুক্তি", "ভার্সাই চুক্তি", "লিসবন চুক্তি"], correct: 1 },
+      { question: "33.২০২৬ সালের অক্টোবরে নেপাল ও বিশ্বব্যাংক কোন দুর্যোগের ঝুঁকি মোকাবিলায় Catastrophe Bond নিয়ে কাজ করার উদ্যোগ নেয়?", options: ["ভূমিকম্প", "ঘূর্ণিঝড়", "খরা", "আগ্নেয়গিরির অগ্ন্যুৎপাত"], correct: 0 },
+      { question: "34.  ২০২৬ সালের অক্টোবরে বাংলাদেশের জন্য এশীয় উন্নয়ন ব্যাংক (ADB) কত বিলিয়ন ডলারের সহায়তা ঘোষণা করেছে বলে প্রতিবেদনে উল্লেখ করা হয়?", options: ["১ বিলিয়ন", "৩ বিলিয়ন", "৫ বিলিয়ন", "১০ বিলিয়ন"], correct: 2 },
+      { question: "35.বাংলার প্রাচীন ইতিহাসে সমতট জনপদটি প্রধানত কোন অঞ্চলে অবস্থিত ছিল?", options: ["উত্তরবঙ্গ", "দক্ষিণ-পূর্ব বাংলা", "পশ্চিম রাঢ়", "পশ্চিমবঙ্গের মালভূমি"], correct: 1 },
+      { question: "36. 2০২৬ সালের অক্টোবরে বাংলাদেশের অর্থায়ন ও উন্নয়ন সহযোগিতা আলোচনায় কোন আঞ্চলিক বাণিজ্য কাঠামোর কথা উঠে আসে?", options: ["RCEP", "OPEC", "NATO", "OIC-এর সামরিক জোট"], correct: 0 },
+      { question: "37.২০২৬ সালের অক্টোবরে বাংলাদেশ ও উন্নয়ন সহযোগীদের আলোচনায় কোন আঞ্চলিক বন্দর-সংযোগের বিষয়টি উঠে আসে?", options: ["চট্টগ্রাম ও রনং বন্দর", "মোংলা ও করাচি বন্দর", "পায়রা ও কলম্বো বন্দর", "চট্টগ্রাম ও সিঙ্গাপুর বন্দর"], correct: 0 },
+      { question: "38. ২০২৬ সালের অক্টোবরে নতুন Country Partnership Framework নিয়ে আলোচনার কথা জানান বাংলাদেশের কোন মন্ত্রী?", options: ["পররাষ্ট্রমন্ত্রী", "অর্থ ও পরিকল্পনামন্ত্রী আমির খসরু মাহমুদ চৌধুরী", "শিক্ষামন্ত্রী", "বাণিজ্যমন্ত্রী"], correct: 1 },
+      { question: "39.২০২৬ সালের অক্টোবরে বাংলাদেশের সঙ্গে নতুন Country Partnership Framework চূড়ান্ত করার আলোচনা কোন প্রতিষ্ঠানের সঙ্গে চলছিল?", options: ["বিশ্বব্যাংক", "বিশ্ব বাণিজ্য সংস্থা", "UNESCO", "বিশ্ব স্বাস্থ্য সংস্থা"], correct: 0 },
+      { question: "40. বাংলাদেশ ব্যাংকের Pre-shipment Credit Refinance Scheme-এর তহবিল ২০২৬ সালে কত থেকে বাড়িয়ে ৭,০০০ কোটি টাকা করা হয়?", options: ["৩,০০০ কোটি টাকা", "৪,০০০ কোটি টাকা", "৫,০০০ কোটি টাকা", "৬,০০০ কোটি টাকা"], correct: 2 },
+    ];
+
+    let userName = "";
+    let currentQuestionIndex = 0;
+    let totalScore = 0;
+    let correctCount = 0;
+    let wrongCount = 0;
+    let userWrongQuestions = []; 
+
+    function startQuiz() {
+      const nameInput = document.getElementById('user-name').value.trim();
+      if(nameInput === "") {
+        alert("Please enter your name!");
+        return;
+      }
+      userName = nameInput;
+      document.getElementById('display-name').innerText = `Shikkharthi: ${userName}`;
+      document.getElementById('user-info-view').style.display = 'none';
+      document.getElementById('quiz-view').style.display = 'block';
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      const currentData = questionsDatabase[currentQuestionIndex];
+      document.getElementById('next-btn').style.display = 'none';
+      const optionsGrid = document.getElementById('options-grid');
+      optionsGrid.innerHTML = '';
+
+      document.getElementById('progress-text').innerText = `Question ${currentQuestionIndex + 1}/${questionsDatabase.length}`;
+      document.getElementById('progress-bar').style.width = `${((currentQuestionIndex + 1) / questionsDatabase.length) * 100}%`;
+      document.getElementById('question-title').innerText = currentData.question;
+
+      currentData.options.forEach((option, index) => {
+        const button = document.createElement('button');
+        button.className = 'option-btn';
+        button.innerText = option;
+        button.onclick = () => selectOption(index, button);
+        optionsGrid.appendChild(button);
+      });
+    }
+
+    function selectOption(selectedIndex, selectedBtn) {
+      const currentData = questionsDatabase[currentQuestionIndex];
+      const allButtons = document.querySelectorAll('.option-btn');
+      allButtons.forEach(btn => btn.disabled = true);
+
+      if (selectedIndex === currentData.correct) {
+        selectedBtn.classList.add('correct');
+        totalScore += 1;
+        correctCount++;
+      } else {
+        selectedBtn.classList.add('wrong');
+        allButtons[currentData.correct].classList.add('correct');
+        totalScore -= 0.25;
+        wrongCount++;
+        
+        userWrongQuestions.push({
+          question: currentData.question,
+          selectedAnswer: currentData.options[selectedIndex],
+          correctAnswer: currentData.options[currentData.correct]
+        });
+      }
+
+      document.getElementById('next-btn').style.display = 'block';
+    }
+
+    function handleNextQuestion() {
+      currentQuestionIndex++;
+      if (currentQuestionIndex < questionsDatabase.length) {
+        loadQuestion();
+      } else {
+        submitResultsToDatabase();
+      }
+    }
+
+    function submitResultsToDatabase() {
+      document.getElementById('quiz-view').style.display = 'none';
+      document.getElementById('result-view').style.display = 'block';
+
+      document.getElementById('final-score').innerText = totalScore.toFixed(2);
+      document.getElementById('correct-count').innerText = correctCount;
+      document.getElementById('wrong-count').innerText = wrongCount;
+
+      db.collection("quiz_results 5").add({
+        name: userName,
+        score: totalScore.toFixed(2),
+        correct: correctCount,
+        wrong: wrongCount,
+        wrongQuestions: userWrongQuestions,
+        time: new Date()
+      })
+      .then(() => {
+        console.log("Folafol shofolbhabe joma hoyese!");
+      })
+      .catch((error) => {
+        console.error("Data save korte shomossa hoyese: ", error);
+      });
+    }
+  </script>
+</body> 
+</html>
